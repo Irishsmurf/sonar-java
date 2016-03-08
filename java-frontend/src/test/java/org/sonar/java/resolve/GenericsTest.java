@@ -675,6 +675,88 @@ public class GenericsTest {
     assertThat(methodSymbol.usages()).hasSize(1);
   }
 
+  @Test
+  public void test_method_resolution_for_parametrized_method_with_type_variable_inheritance() {
+    List<Type> elementTypes = declaredTypes(
+      "class Test<T> {"
+        + "  <S extends T> void foo(S s) {}"
+
+        + "  void test() {"
+        // type substitution provided
+        + "    new Test<A>().<A>foo(new A());"
+        + "    new Test<A>().<B>foo(new B());"
+        // type inference
+        + "    new Test<A>().foo(new A());"
+        + "    new Test<A>().foo(new B());"
+        + "  }"
+        + "}"
+        + "class A {}"
+        + "class B extends A {}");
+
+    JavaType type = (JavaType) elementTypes.get(0);
+    JavaSymbol.MethodJavaSymbol methodSymbol = getMethodSymbol(type, "foo");
+    assertThat(methodSymbol.usages()).hasSize(4);
+
+    elementTypes = declaredTypes(
+      "class Test<T> {"
+        + "  <S extends T> void foo(S s) {}"
+
+        + "  void test() {"
+        // does not compile - not resolved
+        + " new Test<B>().foo(new A());"
+        + " new Test<B>().<A>foo(new A());"
+        + "  }"
+        + "}"
+        + "class A {}"
+        + "class B extends A {}");
+
+    type = (JavaType) elementTypes.get(0);
+    methodSymbol = getMethodSymbol(type, "foo");
+    assertThat(methodSymbol.usages()).hasSize(0);
+  }
+
+  @Test
+  public void test_method_resolution_for_parametrized_method_with_type_variable_inheritance2() {
+    List<Type> elementTypes = declaredTypes(
+      "class PreTest<T> {"
+        + "  <S extends T> void foo(S s) {}"
+        + "}"
+        + "class Test<T> extends PreTest<T> {"
+        + "  void test() {"
+        + "    new Test<A>().<A>foo(new A());"
+        + "    new Test<A>().<B>foo(new B());"
+        + "    new Test<A>().foo(new A());"
+        + "    new Test<A>().foo(new B());"
+        + "  }"
+        + "}"
+
+        + "class Test2 extends Test<A> {"
+        + "  void test2() {"
+        + "    new Test2().<A>foo(new A());"
+        + "    new Test2().<B>foo(new B());"
+        + "    new Test2().foo(new A());"
+        + "    new Test2().foo(new B());"
+        + "  }"
+        + "}"
+
+        + "class Test3 extends Test2 {"
+        + "  void test3() {"
+        + "    new Test3().<A>foo(new A());"
+        + "    new Test3().<B>foo(new B());"
+        + "    new Test3().foo(new A());"
+        + "    new Test3().foo(new B());"
+        + "  }"
+        + "}"
+
+        + "class A {}"
+        + "class B extends A {}");
+
+    JavaType type = (JavaType) elementTypes.get(0);
+    JavaSymbol.MethodJavaSymbol methodSymbol = getMethodSymbol(type, "foo");
+    // FIXME should be 12
+    assertThat(methodSymbol.usages()).hasSize(0);
+  }
+
   private static void methodHasUsagesWithSameTypeAs(JavaType type, String methodName, String... variables) {
     methodHasUsagesWithSameTypeAs(type, methodName, 0, variables);
   }

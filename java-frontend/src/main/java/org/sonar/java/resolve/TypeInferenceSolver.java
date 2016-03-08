@@ -46,7 +46,7 @@ public class TypeInferenceSolver {
         formals = applySubstitution(formals, site);
         substitution = getSubstitutionFromArguments(method, formals, argTypes);
       }
-      if (substitution.size() == 0 || !isValidSubtitution(substitution)) {
+      if (substitution.size() == 0 || !isValidSubtitution(substitution, site)) {
         // substitution discarded
         return null;
       }
@@ -230,37 +230,30 @@ public class TypeInferenceSolver {
         expectedType = expectedType.primitiveWrapperType;
       }
       JavaType.TypeVariableJavaType typeVar = (JavaType.TypeVariableJavaType) formalType;
-      if (subtypeOfAllBounds(expectedType, typeVar.bounds)) {
-        currentSubstitution.add(typeVar, expectedType);
-      }
+      currentSubstitution.add(typeVar, expectedType);
     }
   }
 
-  private static boolean subtypeOfAllBounds(JavaType expectedType, List<JavaType> bounds) {
-    for (JavaType bound : bounds) {
-      if (!expectedType.isSubtypeOf(bound)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  private static boolean isValidSubtitution(TypeSubstitution substitutions) {
+  private static boolean isValidSubtitution(TypeSubstitution substitutions, JavaType site) {
     for (Map.Entry<JavaType.TypeVariableJavaType, JavaType> substitution : substitutions.substitutionEntries()) {
-      if (!isValidSubstitution(substitutions, substitution.getKey(), substitution.getValue())) {
+      if (!isValidSubstitution(substitutions, substitution.getKey(), substitution.getValue(), site)) {
         return false;
       }
     }
     return true;
   }
 
-  private static boolean isValidSubstitution(TypeSubstitution candidate, JavaType.TypeVariableJavaType typeVar, JavaType typeParam) {
+  private static boolean isValidSubstitution(TypeSubstitution candidate, JavaType.TypeVariableJavaType typeVar, JavaType typeParam, JavaType site) {
     for (JavaType bound : typeVar.bounds) {
       while (bound.isTagged(JavaType.TYPEVAR)) {
-        bound = candidate.substitutedType(bound);
-        if (bound == null) {
+        JavaType newBound = candidate.substitutedType(bound);
+        if (newBound == null && isParametrizedType(site)) {
+          newBound = ((JavaType.ParametrizedTypeJavaType) site).typeSubstitution.substitutedType(bound);
+        }
+        if (newBound == null) {
           return false;
         }
+        bound = newBound;
       }
       if (!typeParam.isSubtypeOf(bound)) {
         return false;
