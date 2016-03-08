@@ -664,19 +664,19 @@ public class ExplodedGraphWalker extends BaseTreeVisitor {
     private final List<SECheck> seChecks = new ArrayList<>();
 
     public EGWFactory(List<JavaFileScanner> scanners) {
-      List<SECheck> requestedChecks = new ArrayList<>();
+      List<SECheck> seChecks = new ArrayList<>();
       for (JavaFileScanner scanner : scanners) {
         if (scanner instanceof SECheck) {
-          requestedChecks.add((SECheck) scanner);
+          seChecks.add((SECheck) scanner);
         }
       }
-      alwaysTrueOrFalseChecker = removeOrDefault(requestedChecks, new ConditionAlwaysTrueOrFalseCheck());
+      alwaysTrueOrFalseChecker = removeOrDefault(seChecks, new ConditionAlwaysTrueOrFalseCheck());
       // This order of the mandatory SE checks is required by the ExplodedGraphWalker
-      seChecks.add(alwaysTrueOrFalseChecker);
-      seChecks.add(removeOrDefault(requestedChecks, new NullDereferenceCheck()));
-      seChecks.add(removeOrDefault(requestedChecks, new UnclosedResourcesCheck()));
-      seChecks.add(removeOrDefault(requestedChecks, new LocksNotUnlockedCheck()));
-      seChecks.addAll(requestedChecks);
+      this.seChecks.add(alwaysTrueOrFalseChecker);
+      this.seChecks.add(removeOrDefault(seChecks, new NullDereferenceCheck()));
+      this.seChecks.add(removeOrDefault(seChecks, new UnclosedResourcesCheck()));
+      this.seChecks.add(removeOrDefault(seChecks, new LocksNotUnlockedCheck()));
+      this.seChecks.addAll(seChecks);
     }
 
     public ExplodedGraphWalker walker(JavaFileScannerContext context) {
@@ -684,7 +684,7 @@ public class ExplodedGraphWalker extends BaseTreeVisitor {
     }
 
     @SuppressWarnings("unchecked")
-    private <T extends SECheck> T removeOrDefault(List<SECheck> checks, T defaultInstance) {
+    private static <T extends SECheck> T removeOrDefault(List<SECheck> checks, T defaultInstance) {
       Iterator<SECheck> iterator = checks.iterator();
       while (iterator.hasNext()) {
         SECheck check = iterator.next();

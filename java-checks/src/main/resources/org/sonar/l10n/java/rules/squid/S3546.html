@@ -1,42 +1,7 @@
-<p>Behavior is identical to S2095, but here the user can define the classes that must be monitored using rule parameters.</p>
+<p>Leaking resources in an application is never a good idea, as it can lead to memory issues, and even the crash of the application. This rule template allows you to specify which constructions open a resource and how it is closed in order to raise issue within a method scope when custom resources are leaked.</p>
 
-<h2>Parameters description</h2>
+<h2>See also</h2>
 <ul>
-  <li><b>constructorClasses</b>: List of constructors (use the full qualified class name) that are creating opened resources. An optional signature may be specified after the class name. The constructors must be separated with semicolon. Any new instance created with constructors matching the list will be marked as opened.</li>
-  <li><b>openingMethods</b>:  - List of factory methods (same definition as for closing methods). The result of the method call will be marked as opened.</li>
-  <li><b>closingMethods</b>:  - List of closing methods defined by the full qualified class name, followed by the sign <code>#</code> and the method name.An optional signature may be specified after the class name. Each method definition must be separated with semicolon. The target of the method invocation matching one of these methods will be marked as closed.</li>
-</ul>
+<li> {rule:squid:S2095} - Resources should be closed
+</li></ul>
 
-<b>Note:</b> At least one constructor class or one opening method must be defined on the one hand, and one closing method on the other hand.
-
-<h2>Examples</h2>
-<p>Constructor with full check on parameters: <code>org.assoc.res.MyResource;org.assoc.res.MySpecialResource(java.lang.String, int)</code></p>
-<ul>
-	<li>Each instance created with <code>new MySpecialResource(aString, anInt)</code> will be considered as opening a resource</li>
-	<li>Instances created with <code>new MySpecialResource(aString)</code> will not be considered as opening a resource</li>
-</ul>
-<p>Constructor without check on parameters: <code>org.assoc.res.MyResource;org.assoc.res.MySpecialResource</code></p>
-<ul>
-	<li>Each instance created with <code>create(aString, anInt)</code> will be considered as opening a resource</li>
-	<li>Each instance created with <code>create(aString)</code> will be considered as opening a resource</li>
-</ul>
-<p>Factory method with full check on parameters: <code>org.assoc.res.MyResource;org.assoc.res.MySpecialResource#create(java.lang.String, int)</code></p>
-<ul>
-	<li>Each call to <code>create(aString, anInt)</code> will be considered as opening a resource</li>
-	<li>Call to <code>create(aString)</code> will not be considered as opening a resource</li>
-</ul>
-<p>Factory method without check on parameters: <code>org.assoc.res.MySpecialResource#create</code></p>
-<ul>
-	<li>Each call to <code>create(aString, anInt)</code> will be considered as opening a resource</li>
-	<li>Each call to <code>create(aString)</code> will be considered as opening a resource</li>
-</ul>
-<p>Closing method with full check on parameters: <code>org.assoc.res.MyResource;org.assoc.res.MySpecialResource#close(java.lang.String, int)</code></p>
-<ul>
-	<li>Each call to <code>close(aString, anInt)</code> will be considered as closing a resource</li>
-	<li>Call to <code>close(aString)</code> will not be considered as closing a resource</li>
-</ul>
-<p>Closing method without check on parameters: <code>org.assoc.res.MySpecialResource#close</code></p>
-<ul>
-	<li>Each call to <code>close(aString, anInt)</code> will be considered as closing a resource</li>
-	<li>Each call to <code>close(aString)</code> will be considered as closing a resource</li>
-</ul>

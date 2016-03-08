@@ -58,7 +58,8 @@ import java.util.regex.Pattern;
 @NoSqale
 public class CustomUnclosedResourcesCheck extends SECheck {
 
-  private static final String ARGUMENT_DESCRIPTION = " If the signature is important, then it must be supplied by listing the full qualified names of each argument, coma delimited within parentheses.";
+  private static final String ARGUMENT_DESCRIPTION = " If the signature is important, " +
+    "then it must be supplied by listing the full qualified names of each argument, coma delimited within parentheses.";
 
   private enum Status {
     OPENED, CLOSED
@@ -174,7 +175,7 @@ public class CustomUnclosedResourcesCheck extends SECheck {
     return closingList;
   }
 
-  private abstract class AbstractStatementVisitor extends CheckerTreeNodeVisitor {
+  private static abstract class AbstractStatementVisitor extends CheckerTreeNodeVisitor {
 
     protected AbstractStatementVisitor(ProgramState programState) {
       super(programState);
