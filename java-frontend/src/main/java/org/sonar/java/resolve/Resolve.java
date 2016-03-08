@@ -396,7 +396,7 @@ public class Resolve {
         JavaSymbol best = selectBest(env, callSite, argTypes, typeParams, symbol, bestSoFar.symbol, autoboxing);
         if(best == symbol) {
           bestSoFar = Resolution.resolution(best);
-          bestSoFar.type = typeInferenceSolver.inferReturnType((JavaSymbol.MethodJavaSymbol) best, site, typeParams);
+          bestSoFar.type = typeInferenceSolver.inferReturnType((JavaSymbol.MethodJavaSymbol) best, site, typeParams, argTypes);
         }
       }
     }
@@ -434,7 +434,7 @@ public class Resolve {
       return bestSoFar;
     }
     JavaSymbol.MethodJavaSymbol methodJavaSymbol = (JavaSymbol.MethodJavaSymbol) candidate;
-    TypeInferenceSolver.TypeInference typeInference = typeInferenceSolver.inferTypes(methodJavaSymbol, site, typeParams);
+    TypeInferenceSolver.TypeInference typeInference = typeInferenceSolver.inferTypes(methodJavaSymbol, site, typeParams, argTypes);
     if (typeInference == null) {
       return bestSoFar;
     }

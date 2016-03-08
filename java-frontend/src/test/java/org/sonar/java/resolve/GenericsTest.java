@@ -421,8 +421,7 @@ public class GenericsTest {
 
     JavaType aType = (JavaType) elementTypes.get(0);
     JavaSymbol.MethodJavaSymbol bar = getMethodSymbol(aType, "bar");
-    // FIXME SONARJAVA-1298 type substitution not handled in '<T> List<T> Arrays.asList(T ...) {}'
-    assertThat(bar.usages()).hasSize(0);
+    assertThat(bar.usages()).hasSize(1);
   }
 
   @Test
@@ -625,6 +624,32 @@ public class GenericsTest {
     methodHasUsagesWithSameTypeAs(type, "f9", 1, "dType");
 
     methodHasUsagesWithSameTypeAs(type, "f10", "integer");
+  }
+
+  @Test
+  public void test_method_resolution_with_parametrized_methods() {
+    JavaType aType = (JavaType) declaredTypesFromFile("src/test/files/resolve/ParametrizedMethodsWithTypeInference.java").get(0);
+
+    methodHasUsagesWithSameTypeAs(aType, "f1", "bString");
+    // FIXME type is 'T' when T can not be inferred. Should be Object?
+    methodHasUsagesWithSameTypeAs(aType, "f2", "integer", null);
+    methodHasUsagesWithSameTypeAs(aType, "f3", "integer");
+
+    Type arrayType = getMethodInvocationType(getMethodSymbol(aType, "f4"), 0);
+    assertThat(arrayType.isArray()).isTrue();
+    assertThat(((JavaType.ArrayJavaType) arrayType).elementType.is("java.lang.String")).isTrue();
+
+    methodHasUsagesWithSameTypeAs(aType, "f5", "cStringInteger", "cStringInteger");
+    methodHasUsagesWithSameTypeAs(aType, "f6", "wcSuperA", null, null);
+    methodHasUsagesWithSameTypeAs(aType, "f7", "integer");
+
+    methodHasUsagesWithSameTypeAs(aType, "f8", 0, "object");
+    methodHasUsagesWithSameTypeAs(aType, "f8", 1, "bString");
+
+    methodHasUsagesWithSameTypeAs(aType, "f9", 0, "object", "object");
+    methodHasUsagesWithSameTypeAs(aType, "f9", 1, "dType");
+
+    methodHasUsagesWithSameTypeAs(aType, "f10", "integer");
   }
 
   @Test

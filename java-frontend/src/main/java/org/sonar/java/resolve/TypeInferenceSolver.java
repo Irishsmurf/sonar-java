@@ -46,29 +46,34 @@ public class TypeInferenceSolver {
   }
 
   @CheckForNull
-  TypeInference inferTypes(JavaSymbol.MethodJavaSymbol method, JavaType site, List<JavaType> typeParams) {
+  TypeInference inferTypes(JavaSymbol.MethodJavaSymbol method, JavaType site, List<JavaType> typeParams, List<JavaType> argTypes) {
     List<JavaType> inferedTypes = ((JavaType.MethodJavaType) method.type).argTypes;
     TypeSubstitution substitution = new TypeSubstitution();
-    if (!inferedTypes.isEmpty()) {
-      if (isParametrizedType(site)) {
-        inferedTypes = applySubstitution(inferedTypes, ((JavaType.ParametrizedTypeJavaType) site).typeSubstitution);
-      }
-      if (method.isParametrized() && !typeParams.isEmpty()) {
+    if (isParametrizedType(site)) {
+      inferedTypes = applySubstitution(inferedTypes, ((JavaType.ParametrizedTypeJavaType) site).typeSubstitution);
+    }
+    if (method.isParametrized()) {
+      if (!typeParams.isEmpty()) {
         substitution = getSubstitutionFromTypeParams(method.typeVariableTypes, typeParams);
-        if (substitution.size() == 0) {
-          // no substitution possible
-          return null;
-        }
-        inferedTypes = applySubstitution(inferedTypes, substitution);
+      } else {
+        substitution = getSubstitutionFromArguments(method, inferedTypes, argTypes);
       }
+      if (substitution.size() == 0 || !isValidSubtitution(substitution)) {
+        // substitution discarded
+        return null;
+      }
+      inferedTypes = applySubstitution(inferedTypes, substitution);
     }
     return new TypeInference(inferedTypes, substitution);
   }
 
-  JavaType inferReturnType(JavaSymbol.MethodJavaSymbol method, JavaType site, List<JavaType> typeParams) {
+  JavaType inferReturnType(JavaSymbol.MethodJavaSymbol method, JavaType site, List<JavaType> typeParams, List<JavaType> argTypes) {
     JavaType resultType = applySubstitution(((JavaType.MethodJavaType) method.type).resultType, site);
-    TypeSubstitution substitution = getSubstitutionFromTypeParams(method.typeVariableTypes, typeParams);
-    return applySubstitution(resultType, substitution);
+    TypeInference typeInference = inferTypes(method, site, typeParams, argTypes);
+    if (typeInference != null) {
+      resultType = applySubstitution(resultType, typeInference.substitution);
+    }
+    return resultType;
   }
 
   JavaType applySubstitution(JavaType type, JavaType site) {
@@ -161,12 +166,97 @@ public class TypeInferenceSolver {
         JavaType typeParam = typeParams.get(i);
         substitution.add(typeVariableType, typeParam);
       }
-      if (!isValidSubtitution(substitution)) {
-        // substitution discarded
-        return new TypeSubstitution();
+    }
+    return substitution;
+  }
+
+  private TypeSubstitution getSubstitutionFromArguments(JavaSymbol.MethodJavaSymbol method, List<JavaType> formals, List<JavaType> argTypes) {
+    TypeSubstitution substitution = new TypeSubstitution();
+
+    if (formals.size() > argTypes.size() || formals.isEmpty() || argTypes.isEmpty()) {
+      // no need to try to infer types
+      return substitution;
+    }
+
+    List<JavaType.TypeVariableJavaType> typeVariablesToInfer = new ArrayList<>(method.typeVariableTypes);
+    // compete with type variable from the scope
+    for (JavaType argType : argTypes) {
+      JavaSymbol owner = argType.symbol.owner;
+      if (owner.isMethodSymbol() && ((JavaSymbol.MethodJavaSymbol) owner).typeVariableTypes.contains(argType)) {
+        typeVariablesToInfer.add((JavaType.TypeVariableJavaType) argType);
+      }
+    }
+
+    if (!typeVariablesToInfer.isEmpty()) {
+      for (int i = 0; i < formals.size(); i++) {
+        JavaType formalType = formals.get(i);
+        JavaType argType = argTypes.get(i);
+
+        if (formalType.isTagged(JavaType.TYPEVAR)) {
+          completeSubstitution(substitution, formalType, argType);
+        } else if (formalType.isTagged(JavaType.ARRAY) && argType.isTagged(JavaType.ARRAY)) {
+          completeSubstitution(substitution, ((JavaType.ArrayJavaType) formalType).elementType, ((JavaType.ArrayJavaType) argType).elementType);
+        } else if (formalType.isTagged(JavaType.ARRAY) && method.isVarArgs() && i == formals.size() - 1) {
+          completeSubstitution(substitution, ((JavaType.ArrayJavaType) formalType).elementType, argType);
+        } else if (isParametrizedType(formalType) && isParametrizedType(argType)) {
+          List<JavaType> formalTypeSubstitutedTypes = ((JavaType.ParametrizedTypeJavaType) formalType).typeSubstitution.substitutedTypes();
+          List<JavaType> argTypeSubstitutedTypes = ((JavaType.ParametrizedTypeJavaType) argType).typeSubstitution.substitutedTypes();
+          TypeSubstitution newSubstitution = getSubstitutionFromArguments(method, formalTypeSubstitutedTypes, argTypeSubstitutedTypes);
+          substitution = mergeTypeSubstitutions(substitution, newSubstitution);
+        } else if (isParametrizedType(formalType) && !isParametrizedType(argType) && formalType.erasure() == argType) {
+          List<JavaType> formalTypeSubstitutedTypes = ((JavaType.ParametrizedTypeJavaType) formalType).typeSubstitution.substitutedTypes();
+          List<JavaType> fakeTypes = new ArrayList<>(formalTypeSubstitutedTypes.size());
+          for (int j = 0; j < formalTypeSubstitutedTypes.size(); j++) {
+            fakeTypes.add(symbols.objectType);
+          }
+          TypeSubstitution newSubstitution = getSubstitutionFromArguments(method, formalTypeSubstitutedTypes, fakeTypes);
+          substitution = mergeTypeSubstitutions(substitution, newSubstitution);
+        } else if (isWildcardType(formalType)) {
+          completeSubstitution(substitution, ((JavaType.WildCardType) formalType).bound, argType);
+        }
+
+        if (substitution.typeVariables().containsAll(method.typeVariableTypes)) {
+          // we found all the substitution
+          break;
+        }
       }
     }
     return substitution;
+  }
+
+  private static TypeSubstitution mergeTypeSubstitutions(TypeSubstitution currentSubstitution, TypeSubstitution newSubstitution) {
+    TypeSubstitution result = new TypeSubstitution();
+    for (Map.Entry<JavaType.TypeVariableJavaType, JavaType> substitution : currentSubstitution.substitutionEntries()) {
+      result.add(substitution.getKey(), substitution.getValue());
+    }
+    for (Map.Entry<JavaType.TypeVariableJavaType, JavaType> substitution : newSubstitution.substitutionEntries()) {
+      if (!result.typeVariables().contains(substitution.getKey())) {
+        result.add(substitution.getKey(), substitution.getValue());
+      }
+    }
+    return result;
+  }
+
+  private static void completeSubstitution(TypeSubstitution currentSubstitution, JavaType formalType, JavaType argType) {
+    if (formalType.isTagged(JavaType.TYPEVAR) && currentSubstitution.substitutedType(formalType) == null) {
+      JavaType expectedType = argType;
+      if (expectedType.isPrimitive()) {
+        expectedType = expectedType.primitiveWrapperType;
+      }
+      JavaType.TypeVariableJavaType typeVar = (JavaType.TypeVariableJavaType) formalType;
+      if (subtypeOfAllBounds(expectedType, typeVar.bounds)) {
+        currentSubstitution.add(typeVar, expectedType);
+      }
+    }
+  }
+
+  private static boolean subtypeOfAllBounds(JavaType expectedType, List<JavaType> bounds) {
+    for (JavaType bound : bounds) {
+      if (!expectedType.isSubtypeOf(bound)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private static boolean isValidSubtitution(TypeSubstitution substitutions) {
