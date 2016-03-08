@@ -396,14 +396,18 @@ public class Resolve {
         JavaSymbol best = selectBest(env, callSite, argTypes, typeParams, symbol, bestSoFar.symbol, autoboxing);
         if(best == symbol) {
           bestSoFar = Resolution.resolution(best);
-          bestSoFar.type = typeInferenceSolver.inferReturnType((JavaSymbol.MethodJavaSymbol) best, site, typeParams, argTypes);
+          if (!isConstructor(symbol)) {
+            bestSoFar.type = typeInferenceSolver.inferReturnType((JavaSymbol.MethodJavaSymbol) best, site, typeParams, argTypes);
+          }
         }
       }
     }
     //look in supertypes for more specialized method (overloading).
     if (superclass != null) {
       Resolution method = findMethod(env, callSite, superclass, name, argTypes, typeParams);
-      method.type = typeInferenceSolver.applySubstitution(typeInferenceSolver.applySubstitution(method.type, superclass), site);
+      if (!isConstructor(method.symbol)) {
+        method.type = typeInferenceSolver.applySubstitution(typeInferenceSolver.applySubstitution(method.type, superclass), site);
+      }
       JavaSymbol best = selectBest(env, callSite, argTypes, typeParams, method.symbol, bestSoFar.symbol, autoboxing);
       if(best == method.symbol) {
         bestSoFar = method;
@@ -411,7 +415,9 @@ public class Resolve {
     }
     for (JavaType interfaceType : site.getSymbol().getInterfaces()) {
       Resolution method = findMethod(env, callSite, interfaceType, name, argTypes, typeParams);
-      method.type = typeInferenceSolver.applySubstitution(typeInferenceSolver.applySubstitution(method.type, interfaceType), site);
+      if (!isConstructor(method.symbol)) {
+        method.type = typeInferenceSolver.applySubstitution(typeInferenceSolver.applySubstitution(method.type, interfaceType), site);
+      }
       JavaSymbol best = selectBest(env, callSite, argTypes, typeParams, method.symbol, bestSoFar.symbol, autoboxing);
       if(best == method.symbol) {
         bestSoFar = method;
@@ -421,6 +427,10 @@ public class Resolve {
       bestSoFar = findMethod(env, callSite, site, name, argTypes, typeParams, true);
     }
     return bestSoFar;
+  }
+
+  private static boolean isConstructor(JavaSymbol symbol) {
+    return "<init>".equals(symbol.name);
   }
 
   /**

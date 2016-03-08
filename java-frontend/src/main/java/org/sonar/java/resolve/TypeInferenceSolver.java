@@ -102,10 +102,10 @@ public class TypeInferenceSolver {
     if (isParametrizedType(type)) {
       return applySubstitution((JavaType.ParametrizedTypeJavaType) type, substitution);
     }
-    if (isWildcardType(type)) {
+    if (type.isTagged(JavaType.WILDCARD)) {
       return applySubstitution((JavaType.WildCardType) type, substitution);
     }
-    if (isArrayType(type)) {
+    if (type.isArray()) {
       return applySubstitution((JavaType.ArrayJavaType) type, substitution);
     }
     return type;
@@ -113,14 +113,6 @@ public class TypeInferenceSolver {
 
   private static boolean isParametrizedType(JavaType type) {
     return type instanceof JavaType.ParametrizedTypeJavaType;
-  }
-
-  private static boolean isWildcardType(JavaType type) {
-    return type instanceof JavaType.WildCardType;
-  }
-
-  private static boolean isArrayType(JavaType type) {
-    return type instanceof JavaType.ArrayJavaType;
   }
 
   private JavaType applySubstitution(JavaType.ParametrizedTypeJavaType type, TypeSubstitution substitution) {
@@ -142,7 +134,7 @@ public class TypeInferenceSolver {
   private JavaType applySubstitution(JavaType.ArrayJavaType arrayType, TypeSubstitution substitution) {
     JavaType rootElementType = arrayType.elementType;
     int nbDimensions = 1;
-    while (rootElementType.isTagged(JavaType.ARRAY)) {
+    while (rootElementType.isArray()) {
       rootElementType = ((JavaType.ArrayJavaType) rootElementType).elementType;
       nbDimensions++;
     }
@@ -194,9 +186,9 @@ public class TypeInferenceSolver {
 
         if (formalType.isTagged(JavaType.TYPEVAR)) {
           completeSubstitution(substitution, formalType, argType);
-        } else if (formalType.isTagged(JavaType.ARRAY) && argType.isTagged(JavaType.ARRAY)) {
+        } else if (formalType.isArray() && argType.isArray()) {
           completeSubstitution(substitution, ((JavaType.ArrayJavaType) formalType).elementType, ((JavaType.ArrayJavaType) argType).elementType);
-        } else if (formalType.isTagged(JavaType.ARRAY) && method.isVarArgs() && i == formals.size() - 1) {
+        } else if (formalType.isArray() && method.isVarArgs() && i == formals.size() - 1) {
           completeSubstitution(substitution, ((JavaType.ArrayJavaType) formalType).elementType, argType);
         } else if (isParametrizedType(formalType) && isParametrizedType(argType)) {
           List<JavaType> formalTypeSubstitutedTypes = ((JavaType.ParametrizedTypeJavaType) formalType).typeSubstitution.substitutedTypes();
@@ -211,7 +203,7 @@ public class TypeInferenceSolver {
           }
           TypeSubstitution newSubstitution = getSubstitutionFromArguments(method, formalTypeSubstitutedTypes, fakeTypes);
           substitution = mergeTypeSubstitutions(substitution, newSubstitution);
-        } else if (isWildcardType(formalType)) {
+        } else if (formalType.isTagged(JavaType.WILDCARD)) {
           completeSubstitution(substitution, ((JavaType.WildCardType) formalType).bound, argType);
         }
 
