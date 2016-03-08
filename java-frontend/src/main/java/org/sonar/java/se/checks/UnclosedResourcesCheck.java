@@ -305,7 +305,7 @@ public class UnclosedResourcesCheck extends SECheck {
 
     private void closeResource(@Nullable final SymbolicValue target) {
       if (target != null) {
-        ObjectConstraint oConstraint = ObjectConstraint.constraintWithStatus(programState, target, Status.OPENED);
+        ObjectConstraint oConstraint = programState.getConstraintWithStatus(target, Status.OPENED);
         if (oConstraint != null) {
           programState = programState.addConstraint(target.wrappedValue(), oConstraint.withStatus(Status.CLOSED));
         }

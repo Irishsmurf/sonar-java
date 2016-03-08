@@ -19,11 +19,9 @@
  */
 package org.sonar.java.se.constraint;
 
-import javax.annotation.Nullable;
-
-import org.sonar.java.se.ProgramState;
-import org.sonar.java.se.symbolicvalues.SymbolicValue;
 import org.sonar.plugins.java.api.tree.Tree;
+
+import javax.annotation.Nullable;
 
 public class ObjectConstraint implements Constraint {
 
@@ -50,7 +48,7 @@ public class ObjectConstraint implements Constraint {
     return nullConstraint(null);
   }
 
-  public static ObjectConstraint nullConstraint(@Nullable  Tree syntaxNode) {
+  public static ObjectConstraint nullConstraint(@Nullable Tree syntaxNode) {
     return new ObjectConstraint(true, false, syntaxNode, null);
   }
 
@@ -76,17 +74,6 @@ public class ObjectConstraint implements Constraint {
       return status == null;
     }
     return aState.equals(status);
-  }
-  
-  public static ObjectConstraint constraintWithStatus(ProgramState programState, SymbolicValue value, Object aState) {
-    final Object constraint = programState.getConstraint(value.wrappedValue());
-    if (constraint instanceof ObjectConstraint) {
-      ObjectConstraint oConstraint = (ObjectConstraint) constraint;
-      if (oConstraint.hasStatus(aState)) {
-        return oConstraint;
-      }
-    }
-    return null;
   }
 
   public Tree syntaxNode() {

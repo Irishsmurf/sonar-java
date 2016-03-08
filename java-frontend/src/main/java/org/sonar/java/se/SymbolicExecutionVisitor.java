@@ -32,10 +32,10 @@ import java.util.List;
 public class SymbolicExecutionVisitor extends SubscriptionVisitor {
   private static final Logger LOG = LoggerFactory.getLogger(SymbolicExecutionVisitor.class);
 
-  private final ExplodedGraphWalker.EGWFactory egwFactory;
+  private final ExplodedGraphWalker.ExplodedGraphWalkerFactory egwFactory;
 
   public SymbolicExecutionVisitor(List<JavaFileScanner> executableScanners) {
-    egwFactory = new ExplodedGraphWalker.EGWFactory(executableScanners);
+    egwFactory = new ExplodedGraphWalker.ExplodedGraphWalkerFactory(executableScanners);
   }
 
   @Override
@@ -46,7 +46,7 @@ public class SymbolicExecutionVisitor extends SubscriptionVisitor {
   @Override
   public void visitNode(Tree tree) {
     try {
-      tree.accept(egwFactory.walker(context));
+      tree.accept(egwFactory.createWalker(context));
     } catch (ExplodedGraphWalker.MaximumStepsReachedException | ExplodedGraphWalker.ExplodedGraphTooBigException | BinaryRelation.TransitiveRelationExceededException exception) {
       LOG.debug("Could not complete symbolic execution: ", exception);
     }

@@ -58,31 +58,28 @@ import java.util.regex.Pattern;
 @NoSqale
 public class CustomUnclosedResourcesCheck extends SECheck {
 
-  private static final String ARGUMENT_DESCRIPTION = " If the signature is important, " +
-    "then it must be supplied by listing the full qualified names of each argument, coma delimited within parentheses.";
-
   private enum Status {
     OPENED, CLOSED
   }
 
   @RuleProperty(
     key = "constructor",
-    description = "List of classes (full qualified name) used to create instances that need to be closed." + ARGUMENT_DESCRIPTION)
+    description = "the fully-qualified name of a constructor that creates an open resource. An optional signature may be specified after the class name. E.G. \"org.assoc.res.MyResource\" or \"org.assoc.res.MySpecialResource(java.lang.String, int)\"")
   public String constructor = "";
 
   @RuleProperty(
     key = "factoryMethod",
-    description = "List of classes (full qualified name#methodName) used to open instances that need to be closed." + ARGUMENT_DESCRIPTION)
+    description = "the fully-qualified name of a factory method that returns an open resource, with or without a parameter list. E.G. \"org.assoc.res.ResourceFactory#create\" or \"org.assoc.res.SpecialResourceFactory #create(java.lang.String, int)\"")
   public String factoryMethod = "";
 
   @RuleProperty(
     key = "openingMethod",
-    description = "List of methods (full qualified name#methodName) used to create instances that need to be closed." + ARGUMENT_DESCRIPTION)
+    description = "the fully-qualified name of a method that opens an existing resource, with or without a parameter list. E.G. \"org.assoc.res.ResourceFactory#create\" or \"org.assoc.res.SpecialResourceFactory #create(java.lang.String, int)\"")
   public String openingMethod = "";
 
   @RuleProperty(
     key = "closingMethod",
-    description = "List of methods (full qualified name#methodName) used to close instances that need to be closed." + ARGUMENT_DESCRIPTION)
+    description = "the fully-qualified name of the method which closes the open resource, with or without a parameter list. E.G. \"org.assoc.res.MyResource#closeMe\" or \"org.assoc.res.MySpecialResource#closeMe(java.lang.String, int)\"")
   public String closingMethod = "";
 
   private List<ConstructorMatcher> classConstructor;
@@ -143,39 +140,34 @@ public class CustomUnclosedResourcesCheck extends SECheck {
 
   List<MethodMatcher> factoryMethods() {
     if (factoryList == null) {
-      factoryList = new ArrayList<>();
-      if (factoryMethod.length() > 0) {
-        factoryList = ImmutableList.of(new MethodMatcher(factoryMethod));
-      } else {
-        factoryList = ImmutableList.of();
-      }
+      factoryList = createMethodMatchers(factoryMethod);
     }
     return factoryList;
   }
 
   List<MethodMatcher> openingMethods() {
     if (openingList == null) {
-      if (openingMethod.length() > 0) {
-        openingList = ImmutableList.of(new MethodMatcher(openingMethod));
-      } else {
-        openingList = ImmutableList.of();
-      }
+      openingList = createMethodMatchers(openingMethod);
     }
     return openingList;
   }
 
   List<MethodMatcher> closingMethods() {
     if (closingList == null) {
-      if (closingMethod.length() > 0) {
-        closingList = ImmutableList.of(new MethodMatcher(closingMethod));
-      } else {
-        closingList = ImmutableList.of();
-      }
+      closingList = createMethodMatchers(closingMethod);
     }
     return closingList;
   }
 
-  private static abstract class AbstractStatementVisitor extends CheckerTreeNodeVisitor {
+  private List<MethodMatcher> createMethodMatchers(String rule) {
+    if (rule.length() > 0) {
+      return ImmutableList.of(new MethodMatcher(rule));
+    } else {
+      return ImmutableList.of();
+    }
+  }
+
+  private abstract static class AbstractStatementVisitor extends CheckerTreeNodeVisitor {
 
     protected AbstractStatementVisitor(ProgramState programState) {
       super(programState);
@@ -183,7 +175,7 @@ public class CustomUnclosedResourcesCheck extends SECheck {
 
     protected void closeResource(@Nullable final SymbolicValue target) {
       if (target != null) {
-        ObjectConstraint oConstraint = ObjectConstraint.constraintWithStatus(programState, target, Status.OPENED);
+        ObjectConstraint oConstraint = programState.getConstraintWithStatus(target, Status.OPENED);
         if (oConstraint != null) {
           programState = programState.addConstraint(target.wrappedValue(), oConstraint.withStatus(Status.CLOSED));
         }
@@ -214,18 +206,14 @@ public class CustomUnclosedResourcesCheck extends SECheck {
 
     @Override
     public void visitReturnStatement(ReturnStatementTree syntaxNode) {
-      SymbolicValue currentVal = programState.peekValue();
-      if (currentVal != null) {
-        final ExpressionTree expression = syntaxNode.expression();
-        if (expression != null) {
-          if (expression.is(Tree.Kind.IDENTIFIER)) {
-            final IdentifierTree identifier = (IdentifierTree) expression;
-            currentVal = programState.getValue(identifier.symbol());
-          } else {
-            currentVal = programState.peekValue();
-          }
-          closeResource(currentVal);
+      final ExpressionTree expression = syntaxNode.expression();
+      if (expression != null) {
+        SymbolicValue currentVal = programState.peekValue();
+        if (expression.is(Tree.Kind.IDENTIFIER)) {
+          final IdentifierTree identifier = (IdentifierTree) expression;
+          currentVal = programState.getValue(identifier.symbol());
         }
+        closeResource(currentVal);
       }
     }
 
@@ -344,22 +332,6 @@ public class CustomUnclosedResourcesCheck extends SECheck {
       return type.isSubtypeOf(className);
     }
 
-    protected void appendArguments(StringBuilder buffer) {
-      if (arguments != null) {
-        char delimiter = '(';
-        for (String argument : arguments) {
-          buffer.append(delimiter);
-          buffer.append(argument);
-          delimiter = ',';
-        }
-        buffer.append(')');
-      }
-    }
-
-    protected void appendClass(StringBuilder buffer) {
-      buffer.append(className);
-    }
-
     protected abstract Pattern pattern();
 
     protected abstract int initializeOtherArguments(Matcher matcher);
@@ -393,14 +365,6 @@ public class CustomUnclosedResourcesCheck extends SECheck {
     boolean matches(NewClassTree syntaxNode) {
       Type type = syntaxNode.identifier().symbolType();
       return checkType(type) && checkArguments(syntaxNode.arguments());
-    }
-
-    @Override
-    public String toString() {
-      StringBuilder buffer = new StringBuilder();
-      appendClass(buffer);
-      appendArguments(buffer);
-      return buffer.toString();
     }
   }
 
@@ -437,16 +401,6 @@ public class CustomUnclosedResourcesCheck extends SECheck {
         return methodName.equals(symbol.name()) && checkType(type) && checkArguments(syntaxNode.arguments());
       }
       return false;
-    }
-
-    @Override
-    public String toString() {
-      StringBuilder buffer = new StringBuilder();
-      appendClass(buffer);
-      buffer.append('#');
-      buffer.append(methodName);
-      appendArguments(buffer);
-      return buffer.toString();
     }
   }
 

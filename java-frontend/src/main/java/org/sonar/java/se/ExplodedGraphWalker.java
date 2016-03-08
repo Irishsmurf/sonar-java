@@ -124,7 +124,8 @@ public class ExplodedGraphWalker extends BaseTreeVisitor {
   public static class TooManyNestedBooleanStatesException extends RuntimeException {
   }
 
-  public ExplodedGraphWalker(JavaFileScannerContext context) {
+  @VisibleForTesting
+  ExplodedGraphWalker(JavaFileScannerContext context) {
     alwaysTrueOrFalseChecker = new ConditionAlwaysTrueOrFalseCheck();
     this.checkerDispatcher = new CheckerDispatcher(this, context,
       Lists.<SECheck>newArrayList(alwaysTrueOrFalseChecker, new NullDereferenceCheck(), new UnclosedResourcesCheck(), new LocksNotUnlockedCheck()));
@@ -658,12 +659,12 @@ public class ExplodedGraphWalker extends BaseTreeVisitor {
    * In addition, checks that are needed for a correct ExplodedGraphWalker processing are provided in all cases.
    *
    */
-  public static class EGWFactory {
+  public static class ExplodedGraphWalkerFactory {
 
     private final ConditionAlwaysTrueOrFalseCheck alwaysTrueOrFalseChecker;
     private final List<SECheck> seChecks = new ArrayList<>();
 
-    public EGWFactory(List<JavaFileScanner> scanners) {
+    public ExplodedGraphWalkerFactory(List<JavaFileScanner> scanners) {
       List<SECheck> seChecks = new ArrayList<>();
       for (JavaFileScanner scanner : scanners) {
         if (scanner instanceof SECheck) {
@@ -679,7 +680,7 @@ public class ExplodedGraphWalker extends BaseTreeVisitor {
       this.seChecks.addAll(seChecks);
     }
 
-    public ExplodedGraphWalker walker(JavaFileScannerContext context) {
+    public ExplodedGraphWalker createWalker(JavaFileScannerContext context) {
       return new ExplodedGraphWalker(context, alwaysTrueOrFalseChecker, seChecks);
     }
 
