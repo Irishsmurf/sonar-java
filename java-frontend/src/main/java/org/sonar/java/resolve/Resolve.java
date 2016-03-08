@@ -444,18 +444,21 @@ public class Resolve {
       return bestSoFar;
     }
     JavaSymbol.MethodJavaSymbol methodJavaSymbol = (JavaSymbol.MethodJavaSymbol) candidate;
-    TypeInferenceSolver.TypeInference typeInference = typeInferenceSolver.inferTypes(methodJavaSymbol, site, typeParams, argTypes);
-    if (typeInference == null) {
+    List<JavaType> formals = ((JavaType.MethodJavaType) methodJavaSymbol.type).argTypes;
+    formals = typeInferenceSolver.applySubstitution(formals, site);
+    TypeSubstitution substitution = typeInferenceSolver.inferTypes(methodJavaSymbol, site, typeParams, argTypes);
+    if (substitution == null) {
       return bestSoFar;
     }
-    if (!isArgumentsAcceptable(argTypes, typeInference.inferedTypes, methodJavaSymbol.isVarArgs(), autoboxing)) {
+    formals = typeInferenceSolver.applySubstitution(formals, substitution);
+    if (!isArgumentsAcceptable(argTypes, formals, methodJavaSymbol.isVarArgs(), autoboxing)) {
       return bestSoFar;
     }
     // TODO ambiguity, errors, ...
     if (!isAccessible(env, siteSymbol, candidate)) {
       return new AccessErrorJavaSymbol(candidate, Symbols.unknownType);
     }
-    JavaSymbol mostSpecific = selectMostSpecific(candidate, bestSoFar, typeInference.substitution);
+    JavaSymbol mostSpecific = selectMostSpecific(candidate, bestSoFar, substitution);
     if (mostSpecific.isKind(JavaSymbol.AMBIGUOUS)) {
       // same signature, we keep the first symbol found (overrides the other one).
       mostSpecific = bestSoFar;

@@ -27,16 +27,6 @@ import java.util.Map;
 
 public class TypeInferenceSolver {
 
-  static class TypeInference {
-    final List<JavaType> inferedTypes;
-    final TypeSubstitution substitution;
-
-    private TypeInference(List<JavaType> inferedTypes, TypeSubstitution substitution) {
-      this.inferedTypes = inferedTypes;
-      this.substitution = substitution;
-    }
-  }
-
   private final ParametrizedTypeCache parametrizedTypeCache;
   private final Symbols symbols;
 
@@ -46,34 +36,38 @@ public class TypeInferenceSolver {
   }
 
   @CheckForNull
-  TypeInference inferTypes(JavaSymbol.MethodJavaSymbol method, JavaType site, List<JavaType> typeParams, List<JavaType> argTypes) {
-    List<JavaType> inferedTypes = ((JavaType.MethodJavaType) method.type).argTypes;
+  TypeSubstitution inferTypes(JavaSymbol.MethodJavaSymbol method, JavaType site, List<JavaType> typeParams, List<JavaType> argTypes) {
+    List<JavaType> formals = ((JavaType.MethodJavaType) method.type).argTypes;
     TypeSubstitution substitution = new TypeSubstitution();
-    if (isParametrizedType(site)) {
-      inferedTypes = applySubstitution(inferedTypes, ((JavaType.ParametrizedTypeJavaType) site).typeSubstitution);
-    }
     if (method.isParametrized()) {
       if (!typeParams.isEmpty()) {
         substitution = getSubstitutionFromTypeParams(method.typeVariableTypes, typeParams);
       } else {
-        substitution = getSubstitutionFromArguments(method, inferedTypes, argTypes);
+        formals = applySubstitution(formals, site);
+        substitution = getSubstitutionFromArguments(method, formals, argTypes);
       }
       if (substitution.size() == 0 || !isValidSubtitution(substitution)) {
         // substitution discarded
         return null;
       }
-      inferedTypes = applySubstitution(inferedTypes, substitution);
     }
-    return new TypeInference(inferedTypes, substitution);
+    return substitution;
   }
 
   JavaType inferReturnType(JavaSymbol.MethodJavaSymbol method, JavaType site, List<JavaType> typeParams, List<JavaType> argTypes) {
     JavaType resultType = applySubstitution(((JavaType.MethodJavaType) method.type).resultType, site);
-    TypeInference typeInference = inferTypes(method, site, typeParams, argTypes);
-    if (typeInference != null) {
-      resultType = applySubstitution(resultType, typeInference.substitution);
+    TypeSubstitution substitution = inferTypes(method, site, typeParams, argTypes);
+    if (substitution != null) {
+      resultType = applySubstitution(resultType, substitution);
     }
     return resultType;
+  }
+
+  List<JavaType> applySubstitution(List<JavaType> types, JavaType site) {
+    if (isParametrizedType(site)) {
+      return applySubstitution(types, ((JavaType.ParametrizedTypeJavaType) site).typeSubstitution);
+    }
+    return types;
   }
 
   JavaType applySubstitution(JavaType type, JavaType site) {
